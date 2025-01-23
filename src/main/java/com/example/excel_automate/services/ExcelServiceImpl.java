@@ -1,154 +1,137 @@
 package com.example.excel_automate.services;
 
-import com.example.excel_automate.dtos.RequestDto;
 import com.example.excel_automate.models.LanguageType;
-import org.apache.poi.ss.usermodel.Cell;
-import org.apache.poi.ss.usermodel.Row;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Workbook;
+import com.example.excel_automate.services.ExcelService;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class ExcelServiceImpl implements ExcelService {
 
     public LanguageType languageType = new LanguageType();
 
-    @Override
+//    @Override
+    public void processMultipleLanguages(Workbook mainWorkbook, List<String> languages) throws IOException {
+        for (String language : languages) {
+            System.out.println("Processing for language: " + language);
+
+            Workbook workbookCopy = createWorkbookCopy(mainWorkbook);
+
+            deleteUnwatedColumns(workbookCopy, language);
+
+            saveWorkbook(workbookCopy, language);
+
+            workbookCopy.close();
+        }
+    }
+
+    private Workbook createWorkbookCopy(Workbook sourceWorkbook) {
+        Workbook newWorkbook = new XSSFWorkbook();
+        for (int i = 0; i < sourceWorkbook.getNumberOfSheets(); i++) {
+            Sheet sourceSheet = sourceWorkbook.getSheetAt(i);
+            Sheet targetSheet = newWorkbook.createSheet(sourceSheet.getSheetName());
+            copySheetContents(sourceSheet, targetSheet, sourceWorkbook, newWorkbook);
+        }
+        return newWorkbook;
+    }
+
+    private void copySheetContents(Sheet sourceSheet, Sheet targetSheet, Workbook sourceWorkbook, Workbook targetWorkbook) {
+        Map<CellStyle, CellStyle> styleCache = new HashMap<>();
+        for (int rowIndex = 0; rowIndex <= sourceSheet.getLastRowNum(); rowIndex++) {
+            Row sourceRow = sourceSheet.getRow(rowIndex);
+            if (sourceRow == null) continue;
+
+            Row targetRow = targetSheet.createRow(rowIndex);
+            targetRow.setHeight(sourceRow.getHeight());
+
+            for (int cellIndex = 0; cellIndex < sourceRow.getLastCellNum(); cellIndex++) {
+                Cell sourceCell = sourceRow.getCell(cellIndex);
+                if (sourceCell == null) continue;
+
+                Cell targetCell = targetRow.createCell(cellIndex);
+                copyCell(sourceCell, targetCell, targetWorkbook, styleCache);
+            }
+        }
+    }
+
+    private void copyCell(Cell sourceCell, Cell targetCell, Workbook targetWorkbook, Map<CellStyle, CellStyle> styleCache) {
+        targetCell.setCellType(sourceCell.getCellType());
+        switch (sourceCell.getCellType()) {
+            case STRING:
+                targetCell.setCellValue(sourceCell.getStringCellValue());
+                break;
+            case NUMERIC:
+                targetCell.setCellValue(sourceCell.getNumericCellValue());
+                break;
+            case BOOLEAN:
+                targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                break;
+            case FORMULA:
+                targetCell.setCellFormula(sourceCell.getCellFormula());
+                break;
+            default:
+                break;
+        }
+        if (sourceCell.getCellStyle() != null) {
+            CellStyle cachedStyle = styleCache.get(sourceCell.getCellStyle());
+            if (cachedStyle == null) {
+                cachedStyle = targetWorkbook.createCellStyle();
+                cachedStyle.cloneStyleFrom(sourceCell.getCellStyle());
+                styleCache.put(sourceCell.getCellStyle(), cachedStyle);
+            }
+            targetCell.setCellStyle(cachedStyle);
+        }
+    }
+
     public Workbook deleteUnwatedColumns(Workbook workbook, String lang) {
-        // Get the required columns based on the language
         List<String> requiredLangColumns = languageType.addLanguagesBasedOnCondition(lang);
-
-        System.out.println("Required Columns: " + requiredLangColumns);  // Print out required columns for debugging
-
-        // Iterate through each sheet in the workbook
         for (int sheetIndex = 0; sheetIndex < workbook.getNumberOfSheets(); sheetIndex++) {
             Sheet sheet = workbook.getSheetAt(sheetIndex);
-
-            System.out.println("Processing sheet: " + sheet.getSheetName());
-
-            // Get the header row (row 0)
             Row headerRow = sheet.getRow(0);
-            if (headerRow == null) {
-                continue; // Skip empty sheets
-            }
+            if (headerRow == null) continue;
 
-            // Collect column indices to delete
             List<Integer> columnsToDelete = new ArrayList<>();
             for (int cellIndex = 0; cellIndex < headerRow.getLastCellNum(); cellIndex++) {
                 String headerValue = getCellValue(headerRow.getCell(cellIndex));
-
-                // Print out the column header values for debugging
-                System.out.println("Checking header value: " + headerValue);
-
-                // If the column is not required, add it to the delete list
                 if (!requiredLangColumns.contains(headerValue)) {
                     columnsToDelete.add(cellIndex);
                 }
             }
-
-            // Print out the columns that will be deleted
-            System.out.println("Columns to delete: " + columnsToDelete);
-
-            // Delete columns in reverse order to avoid shifting issues
             for (int i = columnsToDelete.size() - 1; i >= 0; i--) {
-                int columnIndex = columnsToDelete.get(i);
-                deleteColumn(sheet, columnIndex);
+                deleteColumn(sheet, columnsToDelete.get(i));
             }
-
-            // Now remove empty cells by shifting remaining cells left
-            removeEmptyCellsAndShift(sheet);
         }
-
-        return workbook; // Return the updated workbook
+        return workbook;
     }
 
     private void deleteColumn(Sheet sheet, int colIndex) {
-        // Iterate through all rows and shift left all cells to the right of the deleted column
-        int totalRows = sheet.getPhysicalNumberOfRows();
-        for (int rowIndex = 0; rowIndex < totalRows; rowIndex++) {
-            Row row = sheet.getRow(rowIndex);
+        for (Row row : sheet) {
             if (row != null) {
-                // Shift cells to the left after deleting the column
-                shiftCellsLeft(row, colIndex);
-            }
-        }
-    }
-
-    private void shiftCellsLeft(Row row, int colIndex) {
-        // Get the total number of cells in the row
-        int lastCellNum = row.getPhysicalNumberOfCells();
-
-        // Shift all cells from colIndex + 1 to the left
-        for (int i = colIndex + 1; i < lastCellNum; i++) {
-            Cell currentCell = row.getCell(i);
-            if (currentCell != null) {
-                // Shift the cell value to the left cell
-                Cell leftCell = row.createCell(i - 1);
-                leftCell.setCellValue(currentCell.toString());
-
-                // Clear the original cell
-                row.removeCell(currentCell);
-            }
-        }
-
-        // After shifting, remove the last cell in the row
-        Cell lastCell = row.getCell(lastCellNum - 1);
-        if (lastCell != null) {
-            row.removeCell(lastCell);
-        }
-    }
-
-    private void removeEmptyCellsAndShift(Sheet sheet) {
-        int totalRows = sheet.getPhysicalNumberOfRows();  // Get the number of rows
-
-        // Iterate through each row
-        for (int rowIndex = 0; rowIndex < totalRows; rowIndex++) {
-            Row row = sheet.getRow(rowIndex);
-            if (row != null) {
-                int lastCellIndex = row.getPhysicalNumberOfCells();  // Get the last cell index in the row
-
-                // Iterate backward to avoid skipping cells after shifting
-                for (int cellIndex = 0; cellIndex < lastCellIndex; cellIndex++) {
-                    Cell currentCell = row.getCell(cellIndex);
-
-                    // Check if the current cell is null or empty
-                    if (currentCell == null || currentCell.toString().trim().isEmpty()) {
-                        // Check if there are any non-empty cells from the current index to the end of the row
-                        boolean hasNonEmptyCellAfter = false;
-
-                        // Look ahead in the row from the current cell position until the last cell
-                        for (int checkIndex = cellIndex + 1; checkIndex < lastCellIndex; checkIndex++) {
-                            Cell checkCell = row.getCell(checkIndex);
-                            if (checkCell != null && !checkCell.toString().trim().isEmpty()) {
-                                hasNonEmptyCellAfter = true;
-                                break;  // We found a non-empty cell after, no need to shift
-                            }
-                        }
-
-                        // Only shift if there is a non-empty cell after the current one
-                        if (hasNonEmptyCellAfter) {
-                            for (int i = cellIndex; i < lastCellIndex - 1; i++) {
-                                Cell nextCell = row.getCell(i + 1);
-
-                                // Only shift if the next cell exists
-                                if (nextCell != null) {
-                                    Cell cellToShift = row.createCell(i);
-                                    cellToShift.setCellValue(nextCell.toString());
-                                }
-                            }
-
-                            // Remove the last cell in the row after shifting
-                            Cell lastCell = row.getCell(lastCellIndex - 1);
-                            if (lastCell != null) {
-                                row.removeCell(lastCell);  // Remove the last cell as it is now redundant
-                            }
-
-                            break;  // Skip to the next row after handling the empty cell
-                        }
-                    }
+                Cell cell = row.getCell(colIndex);
+                if (cell != null) {
+                    row.removeCell(cell);
                 }
             }
+        }
+    }
+
+    private void saveWorkbook(Workbook workbook, String language) throws IOException {
+        String destinationFolder = "C:\\PowerAutomate";
+        File folder = new File(destinationFolder);
+        if (!folder.exists() && !folder.mkdirs()) {
+            throw new IOException("Failed to create destination folder: " + destinationFolder);
+        }
+        String fileName = destinationFolder + "\\output_" + language.replaceAll("[^a-zA-Z0-9]", "_") + ".xlsx";
+        try (FileOutputStream fileOut = new FileOutputStream(fileName)) {
+            workbook.write(fileOut);
+            System.out.println("Workbook saved as: " + fileName);
         }
     }
 
