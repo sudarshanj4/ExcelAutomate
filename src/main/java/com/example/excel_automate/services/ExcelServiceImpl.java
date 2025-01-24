@@ -15,6 +15,7 @@ public class ExcelServiceImpl{
 
     public LanguageType languageType = new LanguageType();
 
+
 //    @Override
     public Workbook deleteUnwantedColumns(Workbook workbook, String lang) {
         // Get the required columns based on the language
@@ -136,34 +137,6 @@ public class ExcelServiceImpl{
     }
 
 
-
-    private void shiftCellsLeft(Row row, int colIndex) {
-        int lastCellNum = row.getLastCellNum();
-
-        if (colIndex >= 0 && colIndex < lastCellNum) {
-            for (int i = colIndex + 1; i < lastCellNum; i++) {
-                Cell oldCell = row.getCell(i);
-                Cell newCell = row.getCell(i - 1);
-                if (newCell == null) {
-                    newCell = row.createCell(i - 1);
-                }
-                if (oldCell != null) {
-                    newCell.setCellValue(getCellValue(oldCell));
-                } else {
-                    newCell.setBlank();
-                }
-            }
-
-            // Remove the last cell after shifting
-            Cell lastCell = row.getCell(lastCellNum - 1);
-            if (lastCell != null) {
-                row.removeCell(lastCell);
-            }
-        }
-    }
-
-
-
     private String getCellValue(Cell cell) {
         if (cell == null) {
             return "";
@@ -192,6 +165,7 @@ public class ExcelServiceImpl{
 
                 // Process the workbook for the current language
                 Workbook modifiedWorkbook = deleteUnwantedColumns(workbook, language);
+                copyOfDifferentDisplay(modifiedWorkbook,256,277,7);
 
                 // Save the modified workbook for the current language
                 String outputFilePath = "C:\\PowerAutomate\\modified_" + language.replaceAll("[^a-zA-Z0-9]", "_") + ".xlsm";
@@ -205,6 +179,58 @@ public class ExcelServiceImpl{
                 System.err.println("An error occurred while processing the language: " + language);
             }
         }
+
+
+
     }
 
+    public void copyOfDifferentDisplay(Workbook workbook, int startRow, int endRow, int sourceSheetId) {
+        // Get the source sheet using the provided sheet ID
+        Sheet sourceSheet = workbook.getSheetAt(sourceSheetId);
+
+        // Iterate through the target sheets (2 to 8, corresponding to indices 1 to 7)
+        for (int sheetIndex = 1; sheetIndex <= 6; sheetIndex++) {
+            Sheet targetSheet = workbook.getSheetAt(sheetIndex);
+
+            // Copy rows from the specified range
+            for (int rowIndex = startRow; rowIndex <= endRow; rowIndex++) {
+                Row sourceRow = sourceSheet.getRow(rowIndex);
+                if (sourceRow != null) {
+                    // Create the corresponding row in the target sheet
+                    Row targetRow = targetSheet.createRow(rowIndex);
+
+                    // Copy each cell from the source row to the target row
+                    for (int colIndex = 0; colIndex < sourceRow.getLastCellNum(); colIndex++) {
+                        Cell sourceCell = sourceRow.getCell(colIndex);
+                        if (sourceCell != null) {
+                            Cell targetCell = targetRow.createCell(colIndex);
+
+                            // Copy value and type from sourceCell to targetCell
+                            switch (sourceCell.getCellType()) {
+                                case STRING:
+                                    targetCell.setCellValue(sourceCell.getStringCellValue());
+                                    break;
+                                case NUMERIC:
+                                    targetCell.setCellValue(sourceCell.getNumericCellValue());
+                                    break;
+                                case BOOLEAN:
+                                    targetCell.setCellValue(sourceCell.getBooleanCellValue());
+                                    break;
+                                case FORMULA:
+                                    targetCell.setCellFormula(sourceCell.getCellFormula());
+                                    break;
+                                default:
+                                    targetCell.setCellValue(sourceCell.toString());
+                                    break;
+                            }
+
+                            // Optionally copy the cell style
+                            targetCell.setCellStyle(sourceCell.getCellStyle());
+                        }
+                    }
+                }
+            }
+        }
+
+    }
 }
