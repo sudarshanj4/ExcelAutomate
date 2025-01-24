@@ -108,40 +108,61 @@ public class ExcelServiceImpl{
     }
 
     private void deleteColumn(Sheet sheet, int colIndex) {
-        // Iterate through all rows and shift left all cells to the right of the deleted column
-        int totalRows = sheet.getPhysicalNumberOfRows();
-        for (int rowIndex = 0; rowIndex < totalRows; rowIndex++) {
+        for (int rowIndex = 0; rowIndex < sheet.getPhysicalNumberOfRows(); rowIndex++) {
             Row row = sheet.getRow(rowIndex);
             if (row != null) {
-                // Shift cells to the left after deleting the column
-                shiftCellsLeft(row, colIndex);
+                int lastCellNum = row.getLastCellNum();
+                if (colIndex >= 0 && colIndex < lastCellNum) {
+                    for (int i = colIndex; i < lastCellNum - 1; i++) {
+                        Cell oldCell = row.getCell(i + 1);
+                        Cell newCell = row.getCell(i);
+                        if (newCell == null) {
+                            newCell = row.createCell(i);
+                        }
+                        if (oldCell != null) {
+                            newCell.setCellValue(getCellValue(oldCell));
+                        } else {
+                            newCell.setBlank();
+                        }
+                    }
+                    // Remove the last cell after shifting
+                    Cell lastCell = row.getCell(lastCellNum - 1);
+                    if (lastCell != null) {
+                        row.removeCell(lastCell);
+                    }
+                }
             }
         }
     }
+
+
 
     private void shiftCellsLeft(Row row, int colIndex) {
-        // Get the total number of cells in the row
-        int lastCellNum = row.getPhysicalNumberOfCells();
+        int lastCellNum = row.getLastCellNum();
 
-        // Shift all cells from colIndex + 1 to the left
-        for (int i = colIndex + 1; i < lastCellNum; i++) {
-            Cell currentCell = row.getCell(i);
-            if (currentCell != null) {
-                // Shift the cell value to the left cell
-                Cell leftCell = row.createCell(i - 1);
-                leftCell.setCellValue(currentCell.toString());
+        if (colIndex >= 0 && colIndex < lastCellNum) {
+            for (int i = colIndex + 1; i < lastCellNum; i++) {
+                Cell oldCell = row.getCell(i);
+                Cell newCell = row.getCell(i - 1);
+                if (newCell == null) {
+                    newCell = row.createCell(i - 1);
+                }
+                if (oldCell != null) {
+                    newCell.setCellValue(getCellValue(oldCell));
+                } else {
+                    newCell.setBlank();
+                }
+            }
 
-                // Clear the original cell
-                row.removeCell(currentCell);
+            // Remove the last cell after shifting
+            Cell lastCell = row.getCell(lastCellNum - 1);
+            if (lastCell != null) {
+                row.removeCell(lastCell);
             }
         }
-
-        // After shifting, remove the last cell in the row
-        Cell lastCell = row.getCell(lastCellNum - 1);
-        if (lastCell != null) {
-            row.removeCell(lastCell);
-        }
     }
+
+
 
     private String getCellValue(Cell cell) {
         if (cell == null) {
