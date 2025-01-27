@@ -40,10 +40,37 @@ public class ExcelServiceImpl {
                 deleteColumns(sheet, columnsToDelete);
                 shiftColumnsLeft(sheet);
             }
+
+            // Copy text from Column F at row 2500 to B to E columns at row 2500 for non-standard languages
+            if (!lang.equalsIgnoreCase("Standard")) {
+                copyTextFromColumnFToSpecificColumns(sheet);
+            }
+
+
         }
 
         return workbook;
     }
+
+    private void copyTextFromColumnFToSpecificColumns(Sheet sheet) {
+        Row sourceRow = sheet.getRow(2500);
+        if (sourceRow == null) return;
+
+        Cell sourceCell = sourceRow.getCell(6); // Column G is index 6
+        if (sourceCell == null || sourceCell.toString().trim().isEmpty()) return;
+
+        String textToCopy = getCellValue(sourceCell);
+
+        // Copy the text to columns B to E (indexes 1 to 5) at row 2500
+        for (int colIndex = 1; colIndex <= 5; colIndex++) {
+            Cell targetCell = sourceRow.getCell(colIndex);
+            if (targetCell == null) {
+                targetCell = sourceRow.createCell(colIndex);
+            }
+            targetCell.setCellValue(textToCopy);
+        }
+    }
+
 
     private void handleSpecialSheetDeletion(Sheet sheet, List<Integer> columnsToDelete) {
         for (int colIndex : columnsToDelete) {
@@ -212,4 +239,5 @@ public class ExcelServiceImpl {
             }
         }
     }
+
 }
