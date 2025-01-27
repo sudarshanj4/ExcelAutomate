@@ -1,18 +1,16 @@
 package com.example.excel_automate.services;
 
+import com.example.excel_automate.models.FolderNaming;
 import com.example.excel_automate.models.LanguageType;
 import org.apache.poi.ss.usermodel.*;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ExcelServiceImpl {
 
     public LanguageType languageType = new LanguageType();
+    public FolderNaming folderNaming = new FolderNaming();
 
     public Workbook deleteUnwantedColumns(Workbook workbook, String lang) {
         List<String> requiredLangColumns = languageType.addLanguagesBasedOnCondition(lang);
@@ -41,12 +39,10 @@ public class ExcelServiceImpl {
                 shiftColumnsLeft(sheet);
             }
 
-            // Copy text from Column F at row 2500 to B to E columns at row 2500 for non-standard languages
+            // Copy text from Column F to columns B to E at row 2500 for non-standard languages
             if (!lang.equalsIgnoreCase("Standard")) {
                 copyTextFromColumnFToSpecificColumns(sheet);
             }
-
-
         }
 
         return workbook;
@@ -70,7 +66,6 @@ public class ExcelServiceImpl {
             targetCell.setCellValue(textToCopy);
         }
     }
-
 
     private void handleSpecialSheetDeletion(Sheet sheet, List<Integer> columnsToDelete) {
         for (int colIndex : columnsToDelete) {
@@ -189,20 +184,85 @@ public class ExcelServiceImpl {
             try (FileInputStream fis = new FileInputStream(new File(inputFilePath))) {
                 Workbook workbook = WorkbookFactory.create(fis);
                 deleteUnwantedColumns(workbook, language);
-                copyOfDifferentDisplay(workbook, 256, 277, 7);
 
-                String outputFilePath = "C:\\PowerAutomate\\modified_" + language.replaceAll("[^a-zA-Z0-9]", "_") + ".xlsm";
+                // Process for source sheet ID 7 (add "10'")
+                System.out.println("Processing source sheet ID 7...");
+                copyOfDifferentDisplaySizes(workbook, 256, 277, 7);
+                saveSheetsWithTextAddition(workbook, language, "10'");
+
+                // Process for source sheet ID 8 (add "12'")
+                System.out.println("Processing source sheet ID 8...");
+                copyOfDifferentDisplaySizes(workbook, 256, 277, 8);
+                saveSheetsWithTextAddition(workbook, language, "12'");
+
+                // Create a folder for the selected language
+                String languageFolderPath = "C:\\PowerAutomate\\" + folderNaming.folderName(language);
+                createFolder(languageFolderPath);
+
+                // Save the modified file in the language-specific folder
+                String outputFilePath = languageFolderPath + "\\modified_" + language.replaceAll("[^a-zA-Z0-9]", "_") + ".xlsm";
                 try (FileOutputStream fos = new FileOutputStream(new File(outputFilePath))) {
                     workbook.write(fos);
-                    workbook.close();
                 }
+
+                workbook.close();
             } catch (IOException e) {
+                System.err.println("Error processing language " + language + ": " + e.getMessage());
                 e.printStackTrace();
             }
         }
     }
 
-    public void copyOfDifferentDisplay(Workbook workbook, int startRow, int endRow, int sourceSheetId) {
+    public void saveSheetsWithTextAddition(Workbook workbook, String language, String additionalText) {
+        // Determine the suffix (_10 or _12) based on additionalText
+        String suffix = "";
+        if ("10'".equals(additionalText)) {
+            suffix = "_10";
+        } else if ("12'".equals(additionalText)) {
+            suffix = "_12";
+        }
+
+        for (int sheetIndex = 1; sheetIndex < workbook.getNumberOfSheets() - 3; sheetIndex++) {
+            Sheet sheet = workbook.getSheetAt(sheetIndex);
+            String sheetName = sheet.getSheetName();
+            String languageFolderPath = "C:\\PowerAutomate\\" + folderNaming.folderName(language);
+
+            // Ensure the folder exists
+            File languageFolder = new File(languageFolderPath);
+            if (!languageFolder.exists()) {
+                boolean dirCreated = languageFolder.mkdirs();
+                if (!dirCreated) {
+                    System.err.println("Failed to create folder: " + languageFolderPath);
+                    continue; // Skip to the next sheet if folder creation fails
+                }
+            }
+
+            // Create the text file for the current sheet with suffix (_10 or _12)
+            File textFile = new File(languageFolderPath + "\\" + language + "_" + sheetName.replaceAll("[^a-zA-Z0-9]", "_") + suffix + ".txt");
+            try (BufferedWriter writer = new BufferedWriter(new FileWriter(textFile, true))) { // 'true' enables append mode
+                for (Row row : sheet) {
+                    StringBuilder rowContent = new StringBuilder();
+                    for (Cell cell : row) {
+                        rowContent.append(getCellValue(cell)).append("\t");
+                    }
+                    writer.write(rowContent.toString().trim());
+                    writer.newLine();
+                }
+
+                // Do NOT write the additional text inside the file anymore
+                // (This is now only used for filename modification)
+                System.out.println("Saved text file: " + textFile.getAbsolutePath());
+            } catch (IOException e) {
+                System.err.println("Error writing sheet " + sheetName + " to text file: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+
+
+
+    public void copyOfDifferentDisplaySizes(Workbook workbook, int startRow, int endRow, int sourceSheetId) {
         Sheet sourceSheet = workbook.getSheetAt(sourceSheetId);
 
         for (int sheetIndex = 1; sheetIndex <= 6; sheetIndex++) {
@@ -240,4 +300,12 @@ public class ExcelServiceImpl {
         }
     }
 
+
+
+    private void createFolder(String folderPath) {
+        File folder = new File(folderPath);
+        if (!folder.exists()) {
+            folder.mkdirs();
+        }
+    }
 }

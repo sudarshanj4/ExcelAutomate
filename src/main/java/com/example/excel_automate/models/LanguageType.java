@@ -18,6 +18,7 @@ public class LanguageType {
     private final String ChineseTraditional = "Chinese (Traditional, Taiwan)";
     private final String Arabic = "Arabic (Oman)";
 
+
     public List<String> addLanguagesBasedOnCondition(String language_name) {
 
         // Use a mutable list (ArrayList)
@@ -100,4 +101,5 @@ public class LanguageType {
     public String getArabic() {
         return Arabic;
     }
+
 }
