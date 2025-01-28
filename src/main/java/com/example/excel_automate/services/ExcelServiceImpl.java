@@ -169,7 +169,13 @@ public class ExcelServiceImpl {
         if (cell == null) return "";
         switch (cell.getCellType()) {
             case STRING:
-                return cell.getStringCellValue();
+                String stringValue = cell.getStringCellValue();
+                // Check if the value already contains quotes
+                if (stringValue.startsWith("\"") && stringValue.endsWith("\"")) {
+                    return stringValue; // Keep the quotes if they exist
+                } else {
+                    return stringValue; // Return as is if no quotes
+                }
             case NUMERIC:
                 return String.valueOf((int) cell.getNumericCellValue());
             case BOOLEAN:
@@ -179,7 +185,7 @@ public class ExcelServiceImpl {
         }
     }
 
-    public void processMultipleLanguages(String inputFilePath, List<String> languages) {
+    public void processMultipleLanguages(String inputFilePath, List<String> languages, String version) {
         for (String language : languages) {
             try (FileInputStream fis = new FileInputStream(new File(inputFilePath))) {
                 Workbook workbook = WorkbookFactory.create(fis);
@@ -188,15 +194,15 @@ public class ExcelServiceImpl {
                 // Process for source sheet ID 7 (add "10'")
                 System.out.println("Processing source sheet ID 7...");
                 copyOfDifferentDisplaySizes(workbook, 256, 277, 7);
-                saveSheetsWithTextAddition(workbook, language, "10'");
+                saveSheetsWithTextAddition(workbook, language, "10'",version);
 
                 // Process for source sheet ID 8 (add "12'")
                 System.out.println("Processing source sheet ID 8...");
                 copyOfDifferentDisplaySizes(workbook, 256, 277, 8);
-                saveSheetsWithTextAddition(workbook, language, "12'");
+                saveSheetsWithTextAddition(workbook, language, "12'",version);
 
                 // Create a folder for the selected language
-                String languageFolderPath = "C:\\PowerAutomate\\" + folderNaming.folderName(language);
+                String languageFolderPath = "C:\\PowerAutomate\\Excel\\" + folderNaming.folderName(language);
                 createFolder(languageFolderPath);
 
                 // Save the modified file in the language-specific folder
@@ -213,19 +219,29 @@ public class ExcelServiceImpl {
         }
     }
 
-    public void saveSheetsWithTextAddition(Workbook workbook, String language, String additionalText) {
-        // Determine the suffix (_10 or _12) based on additionalText
-        String suffix = "";
+    private String cellToString(Cell cell) {
+        if (cell == null) {
+            return ""; // Return empty for null cells
+        }
+
+        // Use DataFormatter to get the cell's displayed value as-is
+        DataFormatter formatter = new DataFormatter();
+        return formatter.formatCellValue(cell);
+    }
+
+    public void saveSheetsWithTextAddition(Workbook workbook, String language, String additionalText, String versionno) {
+        // Determine the displaySize (_10 or _12) based on additionalText
+        String displaySize = "";
         if ("10'".equals(additionalText)) {
-            suffix = "_10";
+            displaySize = "X2Pro10";
         } else if ("12'".equals(additionalText)) {
-            suffix = "_12";
+            displaySize = "X2Extreme12";
         }
 
         for (int sheetIndex = 1; sheetIndex < workbook.getNumberOfSheets() - 3; sheetIndex++) {
             Sheet sheet = workbook.getSheetAt(sheetIndex);
             String sheetName = sheet.getSheetName();
-            String languageFolderPath = "C:\\PowerAutomate\\" + folderNaming.folderName(language);
+            String languageFolderPath = "C:\\PowerAutomate\\Excel\\" + folderNaming.folderName(language);
 
             // Ensure the folder exists
             File languageFolder = new File(languageFolderPath);
@@ -237,20 +253,22 @@ public class ExcelServiceImpl {
                 }
             }
 
-            // Create the text file for the current sheet with suffix (_10 or _12)
-            File textFile = new File(languageFolderPath + "\\" + language + "_" + sheetName.replaceAll("[^a-zA-Z0-9]", "_") + suffix + ".txt");
+            // Create the text file for the current sheet with displaySize (_10 or _12)
+            File textFile = new File(languageFolderPath + "\\" + "_Txt" + folderNaming.folderName(language) + "_" + displaySize + "_S1_" + versionno + "_" + sheetName + ".txt");
             try (BufferedWriter writer = new BufferedWriter(new FileWriter(textFile, true))) { // 'true' enables append mode
                 for (Row row : sheet) {
-                    StringBuilder rowContent = new StringBuilder();
+                    List<String> cellValues = new ArrayList<>();
                     for (Cell cell : row) {
-                        rowContent.append(getCellValue(cell)).append("\t");
+                        // Simply get the cell value as a string
+                        cellValues.add(cellToString(cell));
                     }
-                    writer.write(rowContent.toString().trim());
-                    writer.newLine();
+                    // Write the row as tab-separated values without adding extra quotes
+                    writer.write(String.join("\t", cellValues));
+                    writer.newLine(); // Add a new line for each row
                 }
 
-                // Do NOT write the additional text inside the file anymore
-                // (This is now only used for filename modification)
+
+
                 System.out.println("Saved text file: " + textFile.getAbsolutePath());
             } catch (IOException e) {
                 System.err.println("Error writing sheet " + sheetName + " to text file: " + e.getMessage());
@@ -258,9 +276,6 @@ public class ExcelServiceImpl {
             }
         }
     }
-
-
-
 
     public void copyOfDifferentDisplaySizes(Workbook workbook, int startRow, int endRow, int sourceSheetId) {
         Sheet sourceSheet = workbook.getSheetAt(sourceSheetId);
@@ -299,8 +314,6 @@ public class ExcelServiceImpl {
             }
         }
     }
-
-
 
     private void createFolder(String folderPath) {
         File folder = new File(folderPath);

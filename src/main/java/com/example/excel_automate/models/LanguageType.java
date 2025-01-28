@@ -9,7 +9,7 @@ public class LanguageType {
     private final String English = "English (United States)";
     private final String German = "German (Germany)";
     private final String Spanish = "Spanish (Spain, International Sort)";
-    private final String Portuguese = "Portuguese (Portugal)";
+    private final String Portuguese = "Portuguese (Brazil)";
     private final String French = "French (France)";
     private final String Italian = "Italian (Italy)";
     private final String Russian = "Russian (Russia)";
