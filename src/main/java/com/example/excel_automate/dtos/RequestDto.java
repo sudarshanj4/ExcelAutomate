@@ -1,26 +1,28 @@
 package com.example.excel_automate.dtos;
 
+import java.util.List;
+
 public class RequestDto {
-    private String language_name;
-    private String enginee_name;
+    private List<String> language_name;
+    private String engine_name;
     private String version;
     private String filePathUrl;
     private String Destination_filePathUrl;
 
-    public String getLanguage_name() {
+    public List<String> getLanguage_name() {
         return language_name;
     }
 
-    public void setLanguage_name(String language_name) {
+    public void setLanguage_name(List<String> language_name) {
         this.language_name = language_name;
     }
 
-    public String getEnginee_name() {
-        return enginee_name;
+    public String getEngine_name() {
+        return engine_name;
     }
 
-    public void setEnginee_name(String enginee_name) {
-        this.enginee_name = enginee_name;
+    public void setEngine_name(String engine_name) {
+        this.engine_name = engine_name;
     }
 
     public String getVersion() {

@@ -1,5 +1,6 @@
 package com.example.excel_automate.services;
 
+import com.example.excel_automate.dtos.RequestDto;
 import com.example.excel_automate.models.FolderNaming;
 import com.example.excel_automate.models.LanguageType;
 import org.apache.poi.ss.usermodel.*;
@@ -11,6 +12,7 @@ public class ExcelServiceImpl {
 
     public LanguageType languageType = new LanguageType();
     public FolderNaming folderNaming = new FolderNaming();
+    public RequestDto requestDto = new RequestDto();
 
     public Workbook deleteUnwantedColumns(Workbook workbook, String lang) {
         List<String> requiredLangColumns = languageType.addLanguagesBasedOnCondition(lang);
@@ -185,7 +187,7 @@ public class ExcelServiceImpl {
         }
     }
 
-    public void processMultipleLanguages(String inputFilePath, List<String> languages, String version) {
+    public void processMultipleLanguages(String inputFilePath, List<String> languages, String version, String destinationPath) {
         for (String language : languages) {
             try (FileInputStream fis = new FileInputStream(new File(inputFilePath))) {
                 Workbook workbook = WorkbookFactory.create(fis);
@@ -194,15 +196,15 @@ public class ExcelServiceImpl {
                 // Process for source sheet ID 7 (add "10'")
                 System.out.println("Processing source sheet ID 7...");
                 copyOfDifferentDisplaySizes(workbook, 256, 277, 7);
-                saveSheetsWithTextAddition(workbook, language, "10'",version);
+                saveSheetsWithTextAddition(workbook, language, "10'",version,destinationPath);
 
                 // Process for source sheet ID 8 (add "12'")
                 System.out.println("Processing source sheet ID 8...");
                 copyOfDifferentDisplaySizes(workbook, 256, 277, 8);
-                saveSheetsWithTextAddition(workbook, language, "12'",version);
+                saveSheetsWithTextAddition(workbook, language, "12'",version,destinationPath);
 
                 // Create a folder for the selected language
-                String languageFolderPath = "C:\\PowerAutomate\\Excel\\" + folderNaming.folderName(language);
+                String languageFolderPath = destinationPath + "\\" + folderNaming.folderName(language);
                 createFolder(languageFolderPath);
 
                 // Save the modified file in the language-specific folder
@@ -229,7 +231,7 @@ public class ExcelServiceImpl {
         return formatter.formatCellValue(cell);
     }
 
-    public void saveSheetsWithTextAddition(Workbook workbook, String language, String additionalText, String versionno) {
+    public void saveSheetsWithTextAddition(Workbook workbook, String language, String additionalText, String versionno,String destinationPath) {
         // Determine the displaySize (_10 or _12) based on additionalText
         String displaySize = "";
         if ("10'".equals(additionalText)) {
@@ -241,7 +243,7 @@ public class ExcelServiceImpl {
         for (int sheetIndex = 1; sheetIndex < workbook.getNumberOfSheets() - 3; sheetIndex++) {
             Sheet sheet = workbook.getSheetAt(sheetIndex);
             String sheetName = sheet.getSheetName();
-            String languageFolderPath = "C:\\PowerAutomate\\Excel\\" + folderNaming.folderName(language);
+            String languageFolderPath = destinationPath +"\\" + folderNaming.folderName(language);
 
             // Ensure the folder exists
             File languageFolder = new File(languageFolderPath);
